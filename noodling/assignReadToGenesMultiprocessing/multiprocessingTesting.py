@@ -14,6 +14,7 @@ Main plan will be to implement a toy method for each of the above then run it at
 from multiprocessing import Pool,Queue,Process
 from itertools import product,repeat
 import random,time,sys
+import matplotlib.pyplot as plt
 """
 import pandas as pd
 import numpy as np
@@ -32,6 +33,10 @@ queue = Queue()
 def writing_process(total,BATCH_SIZE=10):
     print("Writer initialized.")
     writtenElements = 0
+    start=time.time()
+    memoryTimes = []
+    memorySizes = []
+    outputSizes = []
     memory = {} #unorderd
     output = [] #ordered
     currentIndex = 0
@@ -40,14 +45,20 @@ def writing_process(total,BATCH_SIZE=10):
             index,value = queue.get()
             if currentIndex == index:
                 output.append(str(value))
-                print(f"Appened {value} at {currentIndex}.")
+                #print(f"Appened {value} at {currentIndex} cache size is {memoryUsed} bytes.")
+                memorySizes.append(sys.getsizeof(memory))
+                outputSizes.append(sys.getsizeof(output))
+                memoryTimes.append(time.time()-start)
                 currentIndex += 1
             else:
                 memory[index] = str(value)
         try: #Try to add to the output in an ordered way.
             value = memory[currentIndex]
             output.append(value)
-            print(f"Appened {value} at {currentIndex}.")
+            #print(f"Appened {value} at {currentIndex} cache size is {memoryUsed} bytes.")
+            memorySizes.append(sys.getsizeof(memory))
+            outputSizes.append(sys.getsizeof(output))
+            memoryTimes.append(time.time()-start)
             del memory[currentIndex]
             currentIndex += 1
         except KeyError as e:
@@ -62,6 +73,15 @@ def writing_process(total,BATCH_SIZE=10):
                 f.write('\n')
             writtenElements += len(output)
             output=[]
+    plt.subplot(2,1,1)
+    plt.plot(memoryTimes,memorySizes)
+    plt.xlabel("Time (secconds)")
+    plt.ylabel("Memory used (bytes)")
+    plt.subplot(2,1,2)
+    plt.plot(memoryTimes,outputSizes)
+    plt.xlabel("Time (secconds)")
+    plt.ylabel("Memory used (bytes)")
+    plt.show()
     
 def single_process(index,number,power):
     for i in range(10**4):
@@ -96,7 +116,7 @@ def main(number_of_repititions: int):
 
 if __name__ == '__main__':
     #main(1)
-    SIZE = 10**2
+    SIZE = 10**3
     #rewrite output file
     with open(outputFile,'w+') as f:
         f.write("")
