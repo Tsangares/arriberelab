@@ -13,7 +13,8 @@ Main plan will be to implement a toy method for each of the above then run it at
 """
 from multiprocessing import Pool,Queue,Process
 from itertools import product,repeat
-import random,time
+import random,time,sys
+import matplotlib.pyplot as plt
 """
 import pandas as pd
 import numpy as np
@@ -30,50 +31,68 @@ csv.field_size_limit(sys.maxsize)
 outputFile = 'log.log.log'
 queue = Queue()
 def writing_process(total,BATCH_SIZE=10):
+    print("Writer initialized.")
     writtenElements = 0
+    start=time.time()
+    memoryTimes = []
+    memorySizes = []
+    outputSizes = []
     memory = {} #unorderd
     output = [] #ordered
+    currentIndex = 0
     while writtenElements != total:
         if queue.qsize() != 0:
             index,value = queue.get()
-            if len(output) == index:
+            if currentIndex == index:
                 output.append(str(value))
+                #print(f"Appened {value} at {currentIndex} cache size is {memoryUsed} bytes.")
+                memorySizes.append(sys.getsizeof(memory))
+                outputSizes.append(sys.getsizeof(output))
+                memoryTimes.append(time.time()-start)
+                currentIndex += 1
             else:
                 memory[index] = str(value)
-                
         try: #Try to add to the output in an ordered way.
-            output.append(memory[len(output)])
-            print(f"Appened {memory[len(output)]}",len(output))
-        except KeyError:
+            value = memory[currentIndex]
+            output.append(value)
+            #print(f"Appened {value} at {currentIndex} cache size is {memoryUsed} bytes.")
+            memorySizes.append(sys.getsizeof(memory))
+            outputSizes.append(sys.getsizeof(output))
+            memoryTimes.append(time.time()-start)
+            del memory[currentIndex]
+            currentIndex += 1
+        except KeyError as e:
             pass
-        
         #write if I have a batch size of elements.
-        currentBatch = int(len(output)/BATCH_SIZE)
+        currentBatch = int((writtenElements + len(output))/BATCH_SIZE)
         lastBatch    = int(writtenElements/BATCH_SIZE)
         remainingElements = total-writtenElements
         if currentBatch > lastBatch or remainingElements<BATCH_SIZE:
-            elementsToWrite = output[writtenElements:]
             with open(outputFile,'a') as f:
-                f.write('\n'.join(elementsToWrite))
+                f.write('\n'.join(output))
                 f.write('\n')
-            writtenElements += len(elementsToWrite)
+            writtenElements += len(output)
+            output=[]
+    plt.subplot(2,1,1)
+    plt.plot(memoryTimes,memorySizes)
+    plt.xlabel("Time (secconds)")
+    plt.ylabel("Memory used (bytes)")
+    plt.subplot(2,1,2)
+    plt.plot(memoryTimes,outputSizes)
+    plt.xlabel("Time (secconds)")
+    plt.ylabel("Memory used (bytes)")
+    plt.show()
     
 def single_process(index,number,power):
-    for i in range(10**5):
+    for i in range(10**4):
         value = number**power
     queue.put((index,value))
-    return value
     
 def wil_multi(indexes,inputNumbers,power,CPU_CORES=4):
     writer = Process(target=writing_process,args=(len(indexes),))
     writer.start()
     with Pool(CPU_CORES) as p:
         results = p.starmap(single_process,zip(indexes,inputNumbers,repeat(power)))
-        
-    for number,power,result in zip(inputNumbers,repeat(inputPower),results):
-        #print(f"Taking {number} to the power of {power} is {result}")
-        pass
-    
 
 def multiprocessing_with_csv():
     def single_process_to_csv():
@@ -97,8 +116,7 @@ def main(number_of_repititions: int):
 
 if __name__ == '__main__':
     #main(1)
-    SIZE = 100
-    
+    SIZE = 10**3
     #rewrite output file
     with open(outputFile,'w+') as f:
         f.write("")
