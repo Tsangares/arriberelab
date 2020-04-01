@@ -48,7 +48,10 @@ def writing_process(total,BATCH_SIZE=10):
             pass
         
         #write if I have a batch size of elements.
-        if int(len(output)/BATCH_SIZE) > int(writtenElements/BATCH_SIZE) or total-writtenElements<BATCH_SIZE:
+        currentBatch = int(len(output)/BATCH_SIZE)
+        lastBatch    = int(writtenElements/BATCH_SIZE)
+        remainingElements = total-writtenElements
+        if currentBatch > lastBatch or remainingElements<BATCH_SIZE:
             elementsToWrite = output[writtenElements:]
             with open(outputFile,'a') as f:
                 f.write('\n'.join(elementsToWrite))
